@@ -7,8 +7,15 @@ from snowflake.snowpark.functions import col, lit, call_function
 st.set_page_config(page_title="Temperature & Humidity Trends", layout="wide")
 st.title("🌡️ Temperature & 💧 Humidity Trends")
 
+# Connect to Snowflake (make sure the connection name in st.connection matches the one in secrets.toml)
 cnx = st.connection("snowflake")
 session = cnx.session()
+
+# Verify if the session is created successfully
+if session is None:
+    st.error("Error: Could not establish Snowflake connection.")
+    st.stop()
+
 base_df = session.table("my_view")
 
 # --- sidebar filters
@@ -66,7 +73,7 @@ if sel_sites:
     df = df.filter(col("site").isin([lit(s) for s in sel_sites]))
 if sel_rooms:
     df = df.filter(col("room").isin([lit(r) for r in sel_rooms]))
-    
+
 # --- download button for raw data
 raw_pdf = df.sort("ts").to_pandas()
 raw_csv = raw_pdf.to_csv(index=False)
@@ -78,7 +85,6 @@ st.download_button(
 )
 
 # --- bucket time
-# DATE_TRUNC('minute'|'hour'|'day', ts)
 ts_bucket = call_function("DATE_TRUNC", lit(granularity), col("ts"))
 df_buck = (
     df.select(
@@ -107,7 +113,6 @@ kcol3.metric("Max Temp (°C)", f"{pdf['AVG_TEMP_C'].max():.2f}")
 kcol4.metric("Min Temp (°C)", f"{pdf['AVG_TEMP_C'].min():.2f}")
 
 # --- per-location selection for plotting
-# Build a "location" label for convenience
 pdf["location"] = pdf["SITE"].astype(str) + " / " + pdf["ROOM"].astype(str)
 
 locations = sorted(pdf["location"].unique())
